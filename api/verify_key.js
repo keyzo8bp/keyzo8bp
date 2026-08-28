@@ -8,10 +8,7 @@ const supabase = createClient(
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== "POST") {
-      return res.status(405).json({
-        success: false,
-        message: "Method tidak diizinkan"
-      });
+      return res.status(405).json({ success: false, message: "Method tidak diizinkan" });
     }
 
     const key = String(req.body.key || "").trim().toUpperCase();
@@ -19,45 +16,24 @@ module.exports = async function handler(req, res) {
     const device_name = req.body.device_name || "Android Device";
 
     if (!key) {
-      return res.json({
-        success: false,
-        message: "Key kosong"
-      });
+      return res.json({ success: false, message: "Key kosong" });
     }
 
-    const { data, error } = await supabase
+    const { data: row, error } = await supabase
       .from("keyzo_keys")
-      .select("*");
+      .select("*")
+      .eq("key_value", key)
+      .single();
 
-    if (error) {
-      return res.json({
-        success: false,
-        message: "Database error",
-        error: error.message
-      });
-    }
-
-    const row = data.find(item =>
-      String(item.key || item.key_code || "").toUpperCase() === key
-    );
-
-    if (!row) {
-      return res.json({
-        success: false,
-        message: "Key tidak ditemukan"
-      });
+    if (error || !row) {
+      return res.json({ success: false, message: "Key tidak ditemukan" });
     }
 
     if (String(row.status).toLowerCase() !== "active") {
-      return res.json({
-        success: false,
-        message: "Key tidak aktif"
-      });
+      return res.json({ success: false, message: "Key tidak aktif" });
     }
 
     const now = new Date().toISOString();
-
-    const updateColumn = row.key ? "key" : "key_code";
 
     const { error: updateError } = await supabase
       .from("keyzo_keys")
@@ -66,7 +42,7 @@ module.exports = async function handler(req, res) {
         device_name,
         last_login: now
       })
-      .eq(updateColumn, row[updateColumn]);
+      .eq("id", row.id);
 
     if (updateError) {
       return res.json({
@@ -79,7 +55,7 @@ module.exports = async function handler(req, res) {
     return res.json({
       success: true,
       message: "Login berhasil",
-      key: key,
+      key,
       status: "ACTIVE",
       expires_at: row.expires_at,
       device_id,
