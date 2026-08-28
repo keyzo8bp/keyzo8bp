@@ -2,7 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
 module.exports = async function handler(req, res) {
@@ -11,9 +11,11 @@ module.exports = async function handler(req, res) {
       return res.status(405).json({ success: false, message: "Method tidak diizinkan" });
     }
 
-    const key = String(req.body.key || "").trim().toUpperCase();
-    const device_id = req.body.device_id || "UNKNOWN";
-    const device_name = req.body.device_name || "Android Device";
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+
+    const key = String(body?.key || "").trim().toUpperCase();
+    const device_id = body?.device_id || "UNKNOWN";
+    const device_name = body?.device_name || "Android Device";
 
     if (!key) {
       return res.json({ success: false, message: "Key kosong" });
@@ -23,9 +25,13 @@ module.exports = async function handler(req, res) {
       .from("keyzo_keys")
       .select("*")
       .eq("key_value", key)
-      .single();
+      .maybeSingle();
 
-    if (error || !row) {
+    if (error) {
+      return res.json({ success: false, message: "Database error", error: error.message });
+    }
+
+    if (!row) {
       return res.json({ success: false, message: "Key tidak ditemukan" });
     }
 
@@ -56,7 +62,7 @@ module.exports = async function handler(req, res) {
       success: true,
       message: "Login berhasil",
       key,
-      status: "ACTIVE",
+      status: row.status,
       expires_at: row.expires_at,
       device_id,
       device_name,
