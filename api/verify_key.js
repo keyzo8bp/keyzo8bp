@@ -1,43 +1,61 @@
 const { createClient } = require("@supabase/supabase-js");
 
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
 
-module.exports = async function(req, res) {
+module.exports = async function handler(req, res) {
 
   try {
 
-    const {
-      key,
-      device_id,
-      device_name
-    } = req.body;
+    if (req.method !== "POST") {
+
+      return res.status(405).json({
+        success: false,
+        message: "Method tidak diizinkan"
+      });
+
+    }
 
 
-    if(!key){
+    const key =
+      String(req.body.key || "")
+      .trim()
+      .toUpperCase();
+
+
+    const device_id =
+      req.body.device_id || "UNKNOWN";
+
+
+    const device_name =
+      req.body.device_name || "Android Device";
+
+
+    if (!key) {
+
       return res.json({
         success:false,
         message:"Key kosong"
       });
+
     }
 
 
-    const cleanKey =
-      key.trim().toUpperCase();
 
-
-    const {data,error} =
+    const { data, error } =
       await supabase
       .from("keyzo_keys")
       .select("*")
-      .eq("key_code", cleanKey)
+      .eq("key_code", key)
       .single();
 
 
-    if(error || !data){
+
+    if (error || !data) {
 
       return res.json({
         success:false,
@@ -47,7 +65,11 @@ module.exports = async function(req, res) {
     }
 
 
-    if(data.status !== "active"){
+
+    if (
+      String(data.status).toLowerCase()
+      !== "active"
+    ) {
 
       return res.json({
         success:false,
@@ -57,24 +79,42 @@ module.exports = async function(req, res) {
     }
 
 
-    const update =
+
+    const now =
+      new Date()
+      .toISOString();
+
+
+
+    const { error:updateError } =
       await supabase
       .from("keyzo_keys")
       .update({
-        device_id:
-          device_id || "UNKNOWN",
 
-        device_name:
-          device_name || "Android Device",
+        device_id: device_id,
 
-        last_login:
-          new Date().toISOString()
+        device_name: device_name,
+
+        last_login: now
 
       })
       .eq(
         "key_code",
-        cleanKey
+        key
       );
+
+
+
+    if (updateError) {
+
+      return res.json({
+        success:false,
+        message:"Gagal update device",
+        error:updateError.message
+      });
+
+    }
+
 
 
     return res.json({
@@ -83,26 +123,31 @@ module.exports = async function(req, res) {
 
       message:"Login berhasil",
 
-      key:data.key_code,
+      key:key,
 
-      device_id:
-        device_id || "UNKNOWN",
+      status:"ACTIVE",
 
-      device_name:
-        device_name || "Android Device"
+      device_id:device_id,
+
+      device_name:device_name,
+
+      last_login:now
 
     });
 
 
-  } catch(e){
+
+  } catch(error) {
+
 
     return res.status(500).json({
 
       success:false,
 
-      error:e.message
+      error:error.message
 
     });
+
 
   }
 
