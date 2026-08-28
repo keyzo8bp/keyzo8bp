@@ -7,9 +7,11 @@ const supabase = createClient(
 );
 
 
+
 module.exports = async function handler(req, res) {
 
   try {
+
 
     if (req.method !== "POST") {
 
@@ -21,18 +23,22 @@ module.exports = async function handler(req, res) {
     }
 
 
+
     const key =
       String(req.body.key || "")
       .trim()
       .toUpperCase();
 
 
+
     const device_id =
       req.body.device_id || "UNKNOWN";
 
 
+
     const device_name =
       req.body.device_name || "Android Device";
+
 
 
     if (!key) {
@@ -45,6 +51,8 @@ module.exports = async function handler(req, res) {
     }
 
 
+
+    // Cari key di Supabase
 
     const { data, error } =
       await supabase
@@ -66,6 +74,8 @@ module.exports = async function handler(req, res) {
 
 
 
+    // Cek status
+
     if (
       String(data.status).toLowerCase()
       !== "active"
@@ -80,11 +90,38 @@ module.exports = async function handler(req, res) {
 
 
 
+    // Cek expired
+
+    if (
+      data.expires_at &&
+      data.expires_at !== "PERMANENT"
+    ) {
+
+      const expired =
+        new Date(data.expires_at);
+
+
+      if (
+        new Date() >= expired
+      ) {
+
+        return res.json({
+          success:false,
+          message:"Key sudah expired"
+        });
+
+      }
+
+    }
+
+
+
     const now =
-      new Date()
-      .toISOString();
+      new Date().toISOString();
 
 
+
+    // Simpan device
 
     const { error:updateError } =
       await supabase
@@ -99,7 +136,7 @@ module.exports = async function handler(req, res) {
 
       })
       .eq(
-        "key_code",
+        "key",
         key
       );
 
@@ -108,9 +145,13 @@ module.exports = async function handler(req, res) {
     if (updateError) {
 
       return res.json({
+
         success:false,
-        message:"Gagal update device",
+
+        message:"Gagal menyimpan device",
+
         error:updateError.message
+
       });
 
     }
@@ -126,6 +167,9 @@ module.exports = async function handler(req, res) {
       key:key,
 
       status:"ACTIVE",
+
+      expires_at:
+        data.expires_at,
 
       device_id:device_id,
 
@@ -143,6 +187,8 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({
 
       success:false,
+
+      message:"Server error",
 
       error:error.message
 
