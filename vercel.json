@@ -1,8 +1,14 @@
 {
   "version": 2,
   "functions": {
-    "api/*.js": {
+    "api/verify_key.js": {
       "runtime": "nodejs22.x"
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ]
 }
