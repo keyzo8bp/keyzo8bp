@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
       await supabase
       .from("keyzo_keys")
       .select("*")
-      .eq("key_code", key)
+      .eq("key", key)
       .single();
 
 
