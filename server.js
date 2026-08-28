@@ -1,55 +1,159 @@
-const express = require('express');
-const mysql = require('mysql2/promise');
+const express = require("express");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
+
 app.use(express.json());
-app.use(express.urlencoded({extended:true}));
+app.use(express.urlencoded({ extended: true }));
 
-const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME
-});
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
-app.get('/', (req,res)=>{
-  res.send('KEYZO API ONLINE');
-});
 
-app.post('/api/verify_key', async (req,res)=>{
+app.post("/api/verify_key", async (req, res) => {
+
   try {
-    const {key, device_id, device_name} = req.body;
 
-    if(!key) return res.json({success:false,message:'Key kosong'});
+    let {
+      key,
+      device_id,
+      device_name
+    } = req.body;
 
-    const [rows] = await db.execute(
-      'SELECT * FROM keyzo_keys WHERE key_code=? LIMIT 1',
-      [key]
-    );
 
-    if(rows.length===0){
-      return res.json({success:false,message:'Key tidak ditemukan'});
+    if (!key) {
+      return res.json({
+        success: false,
+        message: "Key kosong"
+      });
     }
 
-    const data = rows[0];
 
-    if(data.status !== 'active'){
-      return res.json({success:false,message:'Key tidak aktif'});
+    key = key.toUpperCase().trim();
+
+
+    if (!device_id) {
+      device_id = "UNKNOWN";
     }
 
-    await db.execute(
-      'UPDATE keyzo_keys SET device_id=?, device_name=?, last_login=NOW() WHERE id=?',
-      [device_id, device_name, data.id]
-    );
 
-    res.json({
+    if (!device_name) {
+      device_name = "Android Device";
+    }
+
+
+    const { data, error } = await supabase
+      .from("keyzo_keys")
+      .select("*")
+      .eq("key_code", key)
+      .single();
+
+
+    if (error || !data) {
+
+      return res.json({
+        success:false,
+        message:"Key tidak ditemukan"
+      });
+
+    }
+
+
+    if (
+      data.status.toLowerCase() !== "active"
+    ) {
+
+      return res.json({
+        success:false,
+        message:"Key tidak aktif"
+      });
+
+    }
+
+
+    const now =
+      new Date().toISOString();
+
+
+    const { error:updateError } =
+      await supabase
+      .from("keyzo_keys")
+      .update({
+        device_id: device_id,
+        device_name: device_name,
+        last_login: now
+      })
+      .eq(
+        "key_code",
+        key
+      );
+
+
+    if(updateError){
+
+      return res.json({
+        success:false,
+        message:"Gagal update device"
+      });
+
+    }
+
+
+    return res.json({
+
       success:true,
-      message:'KEYZO OK'
+
+      message:"Login berhasil",
+
+      key:data.key_code,
+
+      status:"ACTIVE",
+
+      device_id:device_id,
+
+      device_name:device_name,
+
+      last_login:now
+
     });
 
-  } catch(e){
-    res.json({success:false,error:e.message});
+
+  } catch(err){
+
+    return res.json({
+
+      success:false,
+
+      message:"Server error",
+
+      error:err.message
+
+    });
+
   }
+
 });
 
-app.listen(3000,()=>console.log('KEYZO API RUNNING'));
+
+
+app.get("/", (req,res)=>{
+
+  res.send("KEYZO API SERVER OK");
+
+});
+
+
+
+const PORT =
+process.env.PORT || 3000;
+
+
+app.listen(PORT,()=>{
+
+ console.log(
+   "KEYZO API running on port "+PORT
+ );
+
+});
