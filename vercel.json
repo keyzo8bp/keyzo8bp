@@ -1,8 +1,15 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs20.x"
+  "builds": [
+    {
+      "src": "api/verify_key.js",
+      "use": "@vercel/node"
     }
-  }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/verify_key.js"
+    }
+  ]
 }
